@@ -1,19 +1,19 @@
-import os
-
 from elasticsearch import Elasticsearch
 
-INDEX_NAME = os.getenv("ES_INDEX", "documents")
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+from .config import settings
+from .models import IndexedDocument
 
 
 def get_es_client() -> Elasticsearch:
-    return Elasticsearch(ELASTICSEARCH_URL)
+    return Elasticsearch(settings.elasticsearch_url)
 
 
-def init_index(es: Elasticsearch) -> None:
-    if not es.indices.exists(index=INDEX_NAME):
-        es.indices.create(
-            index=INDEX_NAME,
+def init_index(es: Elasticsearch | None = None) -> Elasticsearch:
+    client = es or get_es_client()
+
+    if not client.indices.exists(index=settings.es_index):
+        client.indices.create(
+            index=settings.es_index,
             mappings={
                 "properties": {
                     "id": {"type": "keyword"},
@@ -21,3 +21,20 @@ def init_index(es: Elasticsearch) -> None:
                 }
             },
         )
+
+    return client
+
+
+def index_document(
+    document: IndexedDocument,
+    es: Elasticsearch | None = None,
+    refresh: bool = True,
+) -> None:
+    client = es or get_es_client()
+
+    client.index(
+        index=settings.es_index,
+        id=document.id,
+        document=document.model_dump(),
+        refresh=refresh,
+    )

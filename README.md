@@ -23,12 +23,11 @@ docker run -d \
   docker.elastic.co/elasticsearch/elasticsearch:8.15.0
 ```
 
-## Smoke-тест
+## Тесты
 
-Проверяет SQLite и Elasticsearch:
 
 ```bash
-uv run python -m document_search_service.smoke
+uv run pytest
 ```
 
 ## Запуск Flask

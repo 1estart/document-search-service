@@ -1,17 +1,33 @@
+import json
 import sqlite3
+from collections.abc import Iterable, Generator
+from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path("documents.db")
+from .config import settings
+from .models import Document
 
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+@contextmanager
+def connection() -> Generator[sqlite3.Connection]:
+    db_path = Path(settings.database_path)
+
+    if db_path.parent != Path("."):
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    return conn
+
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
-    with get_connection() as conn:
+    with connection() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS documents (
@@ -22,3 +38,55 @@ def init_db() -> None:
             )
             """
         )
+
+
+def _document_to_params(document: Document) -> tuple[str, str, str, str]:
+    return (
+        document.id,
+        json.dumps(document.rubrics, ensure_ascii=False),
+        document.text,
+        document.created_date.isoformat(),
+    )
+
+
+def _row_to_document(row: sqlite3.Row) -> Document:
+    return Document(
+        id=row["id"],
+        rubrics=json.loads(row["rubrics"]),
+        text=row["text"],
+        created_date=datetime.fromisoformat(row["created_date"]),
+    )
+
+
+def upsert_document(document: Document) -> None:
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO documents (id, rubrics, text, created_date)
+            VALUES (?, ?, ?, ?)
+            """,
+            _document_to_params(document),
+        )
+
+
+def get_documents_by_ids(ids: Iterable[str]) -> list[Document]:
+    id_list = list(ids)
+
+    if not id_list:
+        return []
+
+    placeholders = ",".join("?" * len(id_list))
+
+    with connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, rubrics, text, created_date
+            FROM documents
+            WHERE id IN ({placeholders})
+            """,
+            id_list,
+        ).fetchall()
+
+    rows_by_id = {row["id"]: _row_to_document(row) for row in rows}
+
+    return [rows_by_id[document_id] for document_id in id_list if document_id in rows_by_id]
