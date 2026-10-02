@@ -30,6 +30,9 @@ docker run -d \
 uv run pytest
 ```
 
+## Загрузка тестового posts.csv
+uv  run python src/document_search_service/load_posts.py
+
 ## Запуск Flask
 
 ```bash
@@ -47,3 +50,10 @@ curl http://127.0.0.1:5000/health
 ```json
 {"status":"ok"}
 ```
+
+## Проверка search
+```bash
+curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/json"   -d '{"query": "ВАЗ"}' | jq
+curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/json"   -d '{"query": "Мерседес"}' | jq
+```
+

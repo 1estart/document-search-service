@@ -10,6 +10,7 @@ from .models import Document, IndexedDocument
 from .config import settings
 
 app = Flask(__name__)
+app.json.ensure_ascii = False
 
 
 @app.get("/health")
