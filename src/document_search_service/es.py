@@ -39,6 +39,7 @@ def index_document(
         refresh=refresh,
     )
 
+
 def delete_document(
     document_id: str,
     es: Elasticsearch | None = None,

@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from collections.abc import Iterable, Generator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +10,7 @@ from .models import Document
 
 
 @contextmanager
-def connection() -> Generator[sqlite3.Connection]:
+def connection() -> Generator[sqlite3.Connection, None, None]:
     db_path = Path(settings.database_path)
 
     if db_path.parent != Path("."):
@@ -71,7 +71,6 @@ def upsert_document(document: Document) -> None:
 
 def get_documents_by_ids(ids: Iterable[str]) -> list[Document]:
     id_list = list(ids)
-
     if not id_list:
         return []
 
@@ -88,8 +87,9 @@ def get_documents_by_ids(ids: Iterable[str]) -> list[Document]:
         ).fetchall()
 
     rows_by_id = {row["id"]: _row_to_document(row) for row in rows}
+    
+    return [rows_by_id[doc_id] for doc_id in id_list if doc_id in rows_by_id]
 
-    return [rows_by_id[document_id] for document_id in id_list if document_id in rows_by_id]
 
 def delete_document(document_id: str) -> None:
     with connection() as conn:
