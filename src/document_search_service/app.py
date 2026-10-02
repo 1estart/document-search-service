@@ -3,6 +3,10 @@ from .es import get_es_client
 from .db import get_documents_by_ids
 from .db import delete_document as delete_document_from_db
 from .es import delete_document as delete_document_from_index
+from .db import upsert_document
+from .es import index_document
+from .models import Document, IndexedDocument
+
 from .config import settings
 
 app = Flask(__name__)
@@ -46,3 +50,15 @@ def delete_document(document_id: str):
     delete_document_from_index(document_id)
 
     return jsonify({"deleted": document_id})
+
+
+@app.post("/documents")
+def create_document():
+    data = request.get_json()
+
+    document = Document(**data)
+
+    upsert_document(document)
+    index_document(IndexedDocument(id=document.id, text=document.text))
+
+    return jsonify({"created": document.id}), 201

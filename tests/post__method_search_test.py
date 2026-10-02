@@ -55,3 +55,33 @@ def test_delete_document_removes_from_db_and_es(client, monkeypatch):
     assert deleted_from_db == ["doc-1"]
     assert deleted_from_es == ["doc-1"]
     assert response.get_json() == {"deleted": "doc-1"}
+
+def test_post_documents_creates_in_db_and_es(client, monkeypatch):
+    created_in_db = []
+    created_in_es = []
+
+    def fake_upsert_document(document):
+        created_in_db.append(document)
+
+    def fake_index_document(document, es=None, refresh=True):
+        created_in_es.append(document)
+
+    monkeypatch.setattr(app_module, "upsert_document", fake_upsert_document)
+    monkeypatch.setattr(app_module, "index_document", fake_index_document)
+
+    response = client.post(
+        "/documents",
+        json={
+            "id": "doc-1",
+            "rubrics": ["news"],
+            "text": "hello",
+            "created_date": "2026-01-01T00:00:00Z",
+        },
+    )
+
+    assert response.status_code == 201
+    assert created_in_db[0].id == "doc-1"
+    assert created_in_db[0].text == "hello"
+    assert created_in_db[0].rubrics == ["news"]
+    assert created_in_es[0].id == "doc-1"
+    assert created_in_es[0].text == "hello"
