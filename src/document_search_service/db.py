@@ -90,3 +90,10 @@ def get_documents_by_ids(ids: Iterable[str]) -> list[Document]:
     rows_by_id = {row["id"]: _row_to_document(row) for row in rows}
 
     return [rows_by_id[document_id] for document_id in id_list if document_id in rows_by_id]
+
+def delete_document(document_id: str) -> None:
+    with connection() as conn:
+        conn.execute(
+            "DELETE FROM documents WHERE id = ?",
+            (document_id,),
+        )

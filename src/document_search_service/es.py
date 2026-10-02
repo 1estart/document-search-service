@@ -38,3 +38,16 @@ def index_document(
         document=document.model_dump(),
         refresh=refresh,
     )
+
+def delete_document(
+    document_id: str,
+    es: Elasticsearch | None = None,
+    refresh: bool = True,
+) -> None:
+    client = es or get_es_client()
+
+    client.delete(
+        index=settings.es_index,
+        id=document_id,
+        refresh=refresh,
+    )

@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from .es import get_es_client
 from .db import get_documents_by_ids
+from .db import delete_document as delete_document_from_db
+from .es import delete_document as delete_document_from_index
 from .config import settings
 
 app = Flask(__name__)
@@ -11,6 +13,9 @@ def health():
     return jsonify({"status": "ok"})
 
 def search_documents(query: str) -> list[dict]:
+    if not query.strip():
+        return []
+    
     es = get_es_client()
 
     response = es.search(
@@ -34,3 +39,10 @@ def search():
     results = search_documents(query)
 
     return jsonify({"results": results})
+
+@app.delete("/documents/<document_id>")
+def delete_document(document_id: str):
+    delete_document_from_db(document_id)
+    delete_document_from_index(document_id)
+
+    return jsonify({"deleted": document_id})
