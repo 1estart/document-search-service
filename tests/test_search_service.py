@@ -45,6 +45,6 @@ def test_search_documents_queries_es_and_db(monkeypatch):
     result = app_module.search_documents("hello")
 
     assert result == [
-        doc1.model_dump(mode="json"),
         doc2.model_dump(mode="json"),
+        doc1.model_dump(mode="json"),
     ]

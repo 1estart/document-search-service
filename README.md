@@ -57,3 +57,20 @@ curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/jso
 curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/json"   -d '{"query": "Мерседес"}' | jq
 ```
 
+
+## Поднятие всего в докер
+# 1. Собрать образ
+make build
+
+# 2. Поднять сервисы (приложение + Elasticsearch)
+make up
+
+# 3. Загрузить данные из posts.csv (один раз)
+make load
+
+# 4. Проверить
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/search -H "Content-Type: application/json" -d '{"query": "привет"}'
+
+# Логи приложения
+make logs
