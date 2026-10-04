@@ -4,7 +4,7 @@
 
 - Python 3.12
 - uv
-- Docker для Elasticsearch
+- Docker для Elasticsearch и Postgres
 
 ## Установка зависимостей
 
@@ -12,51 +12,15 @@
 uv sync
 ```
 
-## Поднять Elasticsearch
-
-```bash
-docker run -d \
-  --name elasticsearch \
-  -p 9200:9200 \
-  -e discovery.type=single-node \
-  -e xpack.security.enabled=false \
-  docker.elastic.co/elasticsearch/elasticsearch:8.15.0
-```
-
 ## Тесты
+# Только быстрые unit-тесты (без Docker)
+uv run pytest tests/unit -v
 
+# Только медленные интеграционные (нужен Docker)
+uv run pytest tests/slow -v
 
-```bash
-uv run pytest
-```
-
-## Загрузка тестового posts.csv
-uv  run python src/document_search_service/load_posts.py
-
-## Запуск Flask
-
-```bash
-uv run flask --app document_search_service.app run
-```
-
-## Проверка health
-
-```bash
-curl http://127.0.0.1:5000/health
-```
-
-Ожидаемый ответ:
-
-```json
-{"status":"ok"}
-```
-
-## Проверка search
-```bash
-curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/json"   -d '{"query": "ВАЗ"}' | jq
-curl -s -X POST http://127.0.0.1:5000/search   -H "Content-Type: application/json"   -d '{"query": "Мерседес"}' | jq
-```
-
+# Всё вместе
+uv run pytest -v
 
 ## Поднятие всего в докер
 # 1. Собрать образ

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     elasticsearch_url: str = "http://localhost:9200"
     es_index: str = "documents"
-    database_path: str = "documents.db"
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/documents"
 
 
 settings = Settings()
