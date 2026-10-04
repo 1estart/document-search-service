@@ -1,19 +1,19 @@
-import csv
 import ast
+import asyncio
+import csv
 from datetime import datetime
 
-from document_search_service.config import settings
-from document_search_service.db import init_db, upsert_document
-from document_search_service.es import init_index, index_document
-from document_search_service.models import Document, IndexedDocument
+from .config import settings
+from .db import close_pool, init_db, upsert_document
+from .es import close_es_client, index_document, init_index
+from .models import Document, IndexedDocument
 
 
-def load_posts(csv_path: str) -> int:
-    init_db()
-    es = init_index()
+async def load_posts_async(csv_path: str) -> int:
+    await init_db()
+    await init_index()
 
     count = 0
-
     with open(csv_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
@@ -35,18 +35,25 @@ def load_posts(csv_path: str) -> int:
                 ),
             )
 
-            upsert_document(document)
-            index_document(
+            await upsert_document(document)
+            await index_document(
                 IndexedDocument(id=document_id, text=document.text),
-                es=es,
                 refresh=False,
             )
 
             count += 1
 
-    es.indices.refresh(index=settings.es_index)
+    es = await __import__("document_search_service.es", fromlist=["get_es_client"]).get_es_client()
+    await es.indices.refresh(index=settings.es_index)
+
+    await close_pool()
+    await close_es_client()
 
     return count
+
+
+def load_posts(csv_path: str) -> int:
+    return asyncio.run(load_posts_async(csv_path))
 
 
 if __name__ == "__main__":

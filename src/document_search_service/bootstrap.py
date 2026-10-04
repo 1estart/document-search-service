@@ -27,8 +27,15 @@ def wait_for_elasticsearch(timeout: int = 60, interval: float = 1.0) -> None:
 
 def bootstrap() -> None:
     wait_for_elasticsearch()
-    init_db()
-    init_index()
+
+    import asyncio
+
+    asyncio.run(_async_bootstrap())
+
+
+async def _async_bootstrap() -> None:
+    await init_db()
+    await init_index()
 
 
 if __name__ == "__main__":

@@ -16,9 +16,9 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-editable --no-install-project
 
 COPY src ./src
-RUN uv sync --frozen --no-dev --no-editable
-
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
+
+RUN uv sync --frozen --no-dev --no-editable
 
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /data \
@@ -32,4 +32,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fs http://localhost:8000/health || exit 1
 
 ENTRYPOINT ["./docker/entrypoint.sh"]
-CMD ["sh", "-c", "uv run gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2} --access-logfile - --error-logfile - document_search_service.app:app"]
+CMD ["sh", "-c", "uv run uvicorn document_search_service.app:app --host ${HOST:-0.0.0.0} --port ${PORT:-8000} --workers ${WORKERS:-1}"]

@@ -1,93 +1,115 @@
-from pathlib import Path
-from flask import Flask, jsonify, request, send_from_directory
+import asyncio
+from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+from . import db, es
 from .config import settings
-from .db import delete_document as delete_document_from_db
-from .db import get_documents_by_ids, upsert_document
-from .es import delete_document as delete_document_from_index
-from .es import get_es_client, index_document
 from .models import Document, IndexedDocument
 
-app = Flask(__name__)
-app.json.ensure_ascii = False
 
-DOCS_DIR = Path(__file__).parent / "docs"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.init_db()
+    await es.init_index()
+    yield
+    await db.close_pool()
+    await es.close_es_client()
+
+
+app = FastAPI(
+    title="Document Search Service",
+    description="Поиск документов через Elasticsearch + хранение в PostgreSQL",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+
+class SearchRequest(BaseModel):
+    query: str = ""
+
+
+class SearchResponse(BaseModel):
+    results: list[Document]
+
+
+class CreateResponse(BaseModel):
+    created: str
+
+
+class DeleteResponse(BaseModel):
+    deleted: str
+
 
 @app.get("/health")
-def health():
-    return jsonify({"status": "ok"})
+async def health() -> dict:
+    return {"status": "ok"}
 
 
-def search_documents(query: str) -> list[dict]:
-    if not query or not query.strip():
+@app.get("/stats")
+async def stats() -> dict:
+    es_client = await es.get_es_client()
+    es_resp = await es_client.count(index=settings.es_index)
+    es_count = es_resp["count"]
+
+    p = await db.get_pool()
+    async with p.acquire() as conn:
+        pg_count = await conn.fetchval("SELECT COUNT(*) FROM documents")
+
+    return {"es_count": es_count, "pg_count": pg_count}
+
+
+async def search_documents(query: str) -> list[Document]:
+    query = query.strip()
+
+    if not query:
         return []
 
-    es = get_es_client()
-    response = es.search(
+    client = await es.get_es_client()
+
+    response = await client.search(
         index=settings.es_index,
-        query={"match": {"text": query}},
+        query={
+            "multi_match": {
+                "query": query,
+                "fields": ["text", "text.english", "text.raw"],
+            }
+        },
         size=20,
     )
 
     ids = [hit["_id"] for hit in response["hits"]["hits"]]
-    documents = get_documents_by_ids(ids)
-    documents.sort(key=lambda doc: doc.created_date, reverse=True)
+    documents = await db.get_documents_by_ids(ids)
 
-    return [doc.model_dump(mode="json") for doc in documents]
-
-
-@app.post("/search")
-def search():
-    payload = request.get_json(silent=True) or {}
-    query = payload.get("query", "")
-
-    results = search_documents(query)
-    return jsonify({"results": results})
+    return documents
 
 
-@app.delete("/documents/<document_id>")
-def delete_document(document_id: str):
-    delete_document_from_db(document_id)
-    delete_document_from_index(document_id)
-
-    return jsonify({"deleted": document_id})
+@app.post("/search", response_model=SearchResponse)
+async def search(payload: SearchRequest) -> SearchResponse:
+    results = await search_documents(payload.query)
+    return SearchResponse(results=results)
 
 
-@app.post("/documents")
-def create_document():
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "Invalid or missing JSON payload"}), 400
+@app.post("/documents", response_model=CreateResponse, status_code=201)
+async def create_document(document: Document) -> CreateResponse:
+    await asyncio.gather(
+        db.upsert_document(document),
+        es.index_document(IndexedDocument(id=document.id, text=document.text)),
+    )
+    return CreateResponse(created=document.id)
 
-    document = Document(**data)
 
-    upsert_document(document)
-    index_document(IndexedDocument(id=document.id, text=document.text))
+@app.delete("/documents/{document_id}", response_model=DeleteResponse)
+async def delete_document(document_id: str) -> DeleteResponse:
+    await asyncio.gather(
+        db.delete_document(document_id),
+        es.delete_document(document_id),
+    )
+    return DeleteResponse(deleted=document_id)
 
-    return jsonify({"created": document.id}), 201
 
 @app.get("/docs.json")
-def openapi_spec():
-    return send_from_directory(DOCS_DIR, "docs.json", mimetype="application/json")
-
-@app.get("/docs")
-def swagger_ui():
-    return """
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <link rel="stylesheet"
-              href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
-      </head>
-      <body>
-        <div id="swagger-ui"></div>
-        <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-        <script>
-          SwaggerUIBundle({
-            url: "/docs.json",
-            dom_id: "#swagger-ui",
-          });
-        </script>
-      </body>
-    </html>
-    """
+async def openapi_spec():
+    """Отдаём OpenAPI спецификацию для совместимости."""
+    return app.openapi()
