@@ -6,12 +6,12 @@ services:
     environment:
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ES_INDEX: ${ES_INDEX:-documents}
-      DATABASE_PATH: /data/documents.db
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/documents
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
-    volumes:
-      - app-data:/data
     depends_on:
       elasticsearch:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
@@ -32,6 +32,21 @@ services:
       start_period: 40s
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: documents
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d documents"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
-  app-data:
   es-data:
+  pg-data:
