@@ -76,3 +76,37 @@ uv run pytest -v
 - `http://localhost:8000/docs` — Swagger UI
 - `http://localhost:8000/redoc` — ReDoc
 - `http://localhost:8000/openapi.json` — JSON-спецификация
+
+
+## Next Steps
+
+### Быстрые победы
+- [ ] Добавить `ruff` (линт + формат) и `mypy` (типы) в `pyproject.toml`, цели `lint`/`format`/`typecheck` в `Makefile`
+- [ ] Убрать неиспользуемые поля `host`, `port`, `workers` из `config.py`
+- [ ] `/health` проверяет доступность БД и ЕС, возвращает `503` если что-то недоступно
+- [ ] Единый формат ошибок через `exception_handler` в `app.py`
+
+### Надёжность
+- [ ] Компенсация при сбое: запись в БД → индекс → при ошибке откат БД (в `create_document`)
+- [ ] Идемпотентное удаление: индекс → БД, оба не падают на отсутствующих документах
+- [ ] Ретраи для запросов к ЕС (`max_retries`, `retry_on_status`)
+- [ ] Graceful shutdown: закрытие пулов `asyncpg` и `AsyncElasticsearch` в `lifespan`
+
+### Тесты
+- [ ] Функциональные: дубликаты (upsert), валидация дат, спецсимволы, очень длинные запросы
+- [ ] Конкурентность: параллельное создание, параллельный поиск
+- [ ] `hypothesis` — property-based тесты для моделей и парсинга дат
+- [ ] `schemathesis` — fuzzing по `openapi.json`
+- [ ] `mutmut` — mutation testing для `src/`
+
+### Инфраструктура
+- [ ] CI в GitHub Actions: `lint` → `unit` → `slow` (с поднятием сервисов)
+- [ ] Структурированное логирование (`structlog` или `logging` + JSON)
+- [ ] Миграции БД через `alembic`
+- [ ] Метрики (Prometheus) и трейсинг (OpenTelemetry)
+
+### Фичи
+- [ ] Пагинация в поиске (`page`/`size` или курсор)
+- [ ] Ограничение размера `text` и `query` при создании/поиске
+- [ ] Версионирование API: `/api/v1/search`, `/api/v1/documents`
+- [ ] Кэширование результатов поиска (короткий TTL)
