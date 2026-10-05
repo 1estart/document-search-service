@@ -79,7 +79,7 @@ async def index_document(
 async def delete_document(document_id: str, refresh: bool = True) -> None:
     es = await get_es_client()
 
-    await es.delete(
+    await es.options(ignore_status=[404]).delete(
         index=settings.es_index,
         id=document_id,
         refresh=refresh,
